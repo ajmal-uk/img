@@ -62,6 +62,26 @@ def process_text_for_speech(html_text):
     print("Processed text:", expressive_text)
     return expressive_text
 
+@app.route('/voices', methods=['GET'])
+def get_voices():
+    try:
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
+        voices_list = []
+        for voice in voices:
+            voices_list.append({
+                'id': voice.id,
+                'name': voice.name,
+                'languages': voice.languages if hasattr(voice, 'languages') else [],
+                'gender': voice.gender if hasattr(voice, 'gender') else '',
+                'age': voice.age if hasattr(voice, 'age') else ''
+            })
+        return jsonify({'voices': voices_list})
+    except Exception as e:
+        print(f"Error getting voices: {str(e)}")
+        return jsonify({'error': 'Failed to get voices'}), 500
+
+
 # ---------------- IMAGE GENERATOR ROUTE ----------------
 @app.route('/ask-image', methods=['POST'])
 def ask_image():
