@@ -17,17 +17,31 @@ CORS(app)
 
 API_KEY = "byte-ai-image-gen"  # Replace with your real secret key
 
+SUPPORTED_LANGUAGES = ['en', 'es', 'fr', 'de', 'it']
+
 @app.route('/speak', methods=['POST'])
 def speak():
     data = request.json
     text = data.get('text', '')
-    voice_preference = data.get('voice', 'en')  # Default to English
+    voice_input = data.get('voice', 'en|com').strip()
+
+    # Parse voice input into language and tld
+    if '|' in voice_input:
+        lang, tld = voice_input.split('|', 1)
+    else:
+        lang = voice_input
+        tld = 'com'  # Default tld
+
+    # Validate language code
+    if lang not in SUPPORTED_LANGUAGES:
+        lang = 'en'
+        tld = 'com'
 
     print("Original text:", text)
     processed_text = process_text_for_speech(text)
 
     try:
-        tts = gTTS(processed_text, lang=voice_preference)
+        tts = gTTS(processed_text, lang=lang, tld=tld)
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmpfile:
             audio_path = tmpfile.name
             tts.save(audio_path)
@@ -38,6 +52,7 @@ def speak():
             os.remove(audio_path)
 
         return Response(generate(), mimetype='audio/mpeg')
+
     except Exception as e:
         print(f"Error generating speech: {str(e)}")
         return jsonify({'error': 'Failed to generate speech'}), 500
