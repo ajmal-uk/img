@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 import requests
 import tempfile
 import os
+import pyttsx3
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
