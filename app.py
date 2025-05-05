@@ -1,50 +1,48 @@
+from bs4 import BeautifulSoup
+from gtts import gTTS
 from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 import requests
 import tempfile
 import os
-import pyttsx3
+from gtts.lang import tts_langs
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 API_KEY = "byte-ai-image-gen"  # Replace with your real secret key
 
+app = Flask(__name__)
+CORS(app)
+
+API_KEY = "byte-ai-image-gen"  # Replace with your real secret key
 
 @app.route('/speak', methods=['POST'])
 def speak():
     data = request.json
     text = data.get('text', '')
-    voice_preference = data.get('voice', 'english-us')
+    voice_preference = data.get('voice', 'en')  # Default to English
+
     print("Original text:", text)
     processed_text = process_text_for_speech(text)
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 170) 
-    engine.setProperty('volume', 0.9)  
-    voices = engine.getProperty('voices')
-    selected_voice = None
-    for v in voices:
-        if voice_preference.lower() in v.id.lower():
-            selected_voice = v.id
-            break
-    if selected_voice:
-        engine.setProperty('voice', selected_voice)
+
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmpfile:
-            audio_file = tmpfile.name
-        engine.save_to_file(processed_text, audio_file)
-        engine.runAndWait()
+        tts = gTTS(processed_text, lang=voice_preference)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmpfile:
+            audio_path = tmpfile.name
+            tts.save(audio_path)
+
         def generate():
-            with open(audio_file, 'rb') as f:
+            with open(audio_path, 'rb') as f:
                 yield from f
-            os.remove(audio_file)
-        return Response(generate(), mimetype='audio/wav')
+            os.remove(audio_path)
+
+        return Response(generate(), mimetype='audio/mpeg')
     except Exception as e:
         print(f"Error generating speech: {str(e)}")
         return jsonify({'error': 'Failed to generate speech'}), 500
 
 def process_text_for_speech(html_text):
-    from bs4 import BeautifulSoup
     soup = BeautifulSoup(html_text, 'html.parser')
     for table in soup.find_all('table'):
         table.replace_with("... You can see the table with data in the interface ... ")
@@ -65,22 +63,12 @@ def process_text_for_speech(html_text):
 @app.route('/voices', methods=['GET'])
 def get_voices():
     try:
-        engine = pyttsx3.init()
-        voices = engine.getProperty('voices')
-        voices_list = []
-        for voice in voices:
-            voices_list.append({
-                'id': voice.id,
-                'name': voice.name,
-                'languages': voice.languages if hasattr(voice, 'languages') else [],
-                'gender': voice.gender if hasattr(voice, 'gender') else '',
-                'age': voice.age if hasattr(voice, 'age') else ''
-            })
-        return jsonify({'voices': voices_list})
+        languages = tts_langs()
+        voice_list = [{'id': code, 'name': name} for code, name in languages.items()]
+        return jsonify({'voices': voice_list})
     except Exception as e:
         print(f"Error getting voices: {str(e)}")
         return jsonify({'error': 'Failed to get voices'}), 500
-
 
 # ---------------- IMAGE GENERATOR ROUTE ----------------
 @app.route('/ask-image', methods=['POST'])
