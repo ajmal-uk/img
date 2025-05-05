@@ -9,6 +9,58 @@ CORS(app)  # Enable CORS for all routes
 
 API_KEY = "byte-ai-image-gen"  # Replace with your real secret key
 
+
+@app.route('/speak', methods=['POST'])
+def speak():
+    data = request.json
+    text = data.get('text', '')
+    voice_preference = data.get('voice', 'english-us')
+    print("Original text:", text)
+    processed_text = process_text_for_speech(text)
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 170) 
+    engine.setProperty('volume', 0.9)  
+    voices = engine.getProperty('voices')
+    selected_voice = None
+    for v in voices:
+        if voice_preference.lower() in v.id.lower():
+            selected_voice = v.id
+            break
+    if selected_voice:
+        engine.setProperty('voice', selected_voice)
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmpfile:
+            audio_file = tmpfile.name
+        engine.save_to_file(processed_text, audio_file)
+        engine.runAndWait()
+        def generate():
+            with open(audio_file, 'rb') as f:
+                yield from f
+            os.remove(audio_file)
+        return Response(generate(), mimetype='audio/wav')
+    except Exception as e:
+        print(f"Error generating speech: {str(e)}")
+        return jsonify({'error': 'Failed to generate speech'}), 500
+
+def process_text_for_speech(html_text):
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html_text, 'html.parser')
+    for table in soup.find_all('table'):
+        table.replace_with("... You can see the table with data in the interface ... ")
+    for pre in soup.find_all('pre'):
+        pre.replace_with("... Code snippet is available in the interface ... ")
+    clean_text = soup.get_text(separator=' ', strip=True)
+    expressive_text = clean_text.replace('?', '? ... ')
+    expressive_text = expressive_text.replace('!', '! ... ')
+    expressive_text = expressive_text.replace('.', '. ... ')
+    expressive_text = expressive_text.replace('User', 'User ... ')
+    emphasis_words = ['important', 'note', 'warning', 'error', 'success']
+    for word in emphasis_words:
+        expressive_text = expressive_text.replace(word, f"{word} ... ")
+    expressive_text = "... " + expressive_text
+    print("Processed text:", expressive_text)
+    return expressive_text
+
 # ---------------- IMAGE GENERATOR ROUTE ----------------
 @app.route('/ask-image', methods=['POST'])
 def ask_image():
